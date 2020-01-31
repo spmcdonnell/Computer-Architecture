@@ -3,16 +3,6 @@
 import sys
 
 
-# LOAD
-LDI = 0b10000010
-# Print
-PRN = 0b01000111
-# Multiply
-MUL = 0b10100010
-# Halt
-HTL = 0b00000001
-
-
 class CPU:
     """Main CPU class."""
 
@@ -21,6 +11,18 @@ class CPU:
         self.ram = [0] * 256
         self.pc = 0
         self.reg = [0] * 8
+        self.SP = 7
+        self.fl = 0
+        self.branchtable = {}
+        self.branchtable[0b10000010] = self.handle_LDI
+        self.branchtable[0b01000111] = self.handle_PRN
+        self.branchtable[0b10100010] = self.handle_MUL
+        self.branchtable[0b01000101] = self.handle_PUSH
+        self.branchtable[0b01000110] = self.handle_POP
+        self.branchtable[0b10100111] = self.handle_CMP
+        self.branchtable[0b01010100] = self.handle_JMP
+        self.branchtable[0b01010101] = self.handle_JEQ
+        self.branchtable[0b01010110] = self.handle_JNE
 
     def load(self):
         """Load a program into memory."""
@@ -60,6 +62,10 @@ class CPU:
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
             return self.reg[reg_a]
+        elif op == "CMP":
+            if self.reg[reg_a] == self.reg[reg_b]:
+                self.fl = 1
+
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -71,7 +77,7 @@ class CPU:
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
             self.pc,
-            # self.fl,
+            self.fl,
             # self.ie,
             self.ram_read(self.pc),
             self.ram_read(self.pc + 1),
@@ -83,12 +89,65 @@ class CPU:
 
         print()
 
+    def handle_LDI(self, a, b):
+        self.reg[a] = b
+
+        self.pc += 3
+
+    def handle_PRN(self, a, b):
+        print(self.reg[a])
+
+        self.pc += 2
+
+    def handle_MUL(self, a, b):
+        self.alu('MUL', a, b)
+
+        self.pc += 3
+
+    def handle_PUSH(self, a, b):
+        self.reg[self.SP] -= 1
+
+        value = self.reg[a]
+
+        self.ram[self.reg[self.SP]] = value
+
+        self.pc += 2
+
+    def handle_POP(self, a, b):
+        value = self.ram[self.reg[self.SP]]
+
+        self.reg[a] = value
+
+        self.reg[self.SP] += 1
+        self.pc += 2
+
+    def handle_CMP(self, a, b):
+        self.alu('CMP', a, b)
+
+        self.pc += 3
+
+    def handle_JMP(self, a, b):
+        self.pc = self.reg[a]
+
+    def handle_JEQ(self, a, b):
+        if self.fl == 1:
+
+            self.pc = self.reg[a]
+        else:
+
+            self.pc += 2
+
+    def handle_JNE(self, a, b):
+        if self.fl == 0:
+
+            self.pc = self.reg[a]
+        else:
+
+            self.pc += 2
+
     def run(self):
         """Run the CPU."""
 
-        PRN = 0b01000111
-        LDI = 0b10000010
-        MUL = 0b10100010
         HTL = 0b00000001
 
         while True:
@@ -97,21 +156,12 @@ class CPU:
             operand_a = self.ram_read(self.pc + 1)
             operand_b = self.ram_read(self.pc + 2)
 
-            if ir == PRN:
-
-                print(self.reg[operand_a])
-                self.pc += 2
-
-            elif ir == LDI:
-
-                self.reg[operand_a] = operand_b
-                self.pc += 3
-
-            elif ir == MUL:
-
-                self.alu('MUL', operand_a, operand_b)
-                self.pc += 3
-
-            elif ir == HTL:
-
+            if ir == HTL:
                 break
+
+            else:
+                try:
+                    self.branchtable[ir](operand_a, operand_b)
+                except:
+                    print(f"Instruction unknown {ir}")
+                    sys.exit(1)
