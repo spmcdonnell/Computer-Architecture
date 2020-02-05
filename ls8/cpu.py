@@ -23,6 +23,7 @@ class CPU:
         self.branchtable[0b01010100] = self.handle_JMP
         self.branchtable[0b01010101] = self.handle_JEQ
         self.branchtable[0b01010110] = self.handle_JNE
+        self.branchtable[0b01001000] = self.handle_PRA
 
     def load(self):
         """Load a program into memory."""
@@ -65,7 +66,6 @@ class CPU:
         elif op == "CMP":
             if self.reg[reg_a] == self.reg[reg_b]:
                 self.fl = 1
-
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -144,6 +144,11 @@ class CPU:
         else:
 
             self.pc += 2
+
+    def handle_PRA(self, a, b):
+        print(chr(self.reg[a]))
+
+        self.pc += 2
 
     def run(self):
         """Run the CPU."""
